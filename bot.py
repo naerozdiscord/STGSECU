@@ -2766,6 +2766,179 @@ async def before_ghostping_scheduler():
 
 
 
+# ============================================================
+# /help — PANNEAU D'AIDE STG SÉCURITÉ (COMPONENTS V2)
+# ============================================================
+STG_HELP_BANNER_PATH = Path(__file__).parent / "stg_securite_help.png"
+
+HELP_SECTIONS = {
+    "security": (
+        "🛡️ SÉCURITÉ",
+        "Protection et prévention du serveur.",
+        "`+antilink` — Protection contre les liens / invitations\n"
+        "`+antiraid` — Configuration de l'anti-raid\n"
+        "`+mrbeast` — Protection contre le spam de 4 images\n"
+        "`+ghostping` — Panel de ghost ping automatique\n"
+        "`+autoping` — Messages automatiques à l'arrivée d'un membre",
+    ),
+    "moderation": (
+        "🔨 MODÉRATION",
+        "Commandes destinées à la gestion des membres.",
+        "`+ban` — Bannir un membre\n"
+        "`+kick` — Expulser un membre\n"
+        "`+mute` / `+unmute` — Gérer un mute\n"
+        "`+tempmute` — Mute temporaire\n"
+        "`+warn` / `+check_warns` — Avertissements\n"
+        "`+clear` — Supprimer plusieurs messages\n"
+        "`+lockdown` — Verrouiller un salon",
+    ),
+    "utility": (
+        "⚙️ UTILITAIRES",
+        "Informations et outils pratiques.",
+        "`+stats` — Statistiques Components V2\n"
+        "`+ping` — Latence du bot\n"
+        "`+info` — Informations sur un membre\n"
+        "`+avatar` — Avatar d'un membre\n"
+        "`+server_info` — Informations du serveur\n"
+        "`+server_emojis` — Emojis du serveur\n"
+        "`+uptime` — Temps d'activité du bot",
+    ),
+    "systems": (
+        "📦 SYSTÈMES",
+        "Configuration des principaux systèmes STG.",
+        "`+setup_logs` — Configurer les salons de logs\n"
+        "`+setup_vip_access` — Installer le panneau VIP\n"
+        "`+emoji add` — Ajouter un emoji au serveur\n"
+        "`+private_channel` — Créer un salon privé\n"
+        "`+add_note` / `+show_notes` — Notes de modération\n"
+        "`/setghostping` — Configuration slash du ghost ping",
+    ),
+}
+
+
+def _help_container(section_key: str | None = None):
+    container = ui.Container(accent_colour=discord.Colour.from_str("#111111"))
+
+    # Bannière panoramique, comme le panneau de référence.
+    container.add_item(
+        ui.MediaGallery(
+            ui.MediaGalleryItem("attachment://stg_securite_help.png")
+        )
+    )
+
+    container.add_item(ui.TextDisplay(
+        "# STG Sécurité\n"
+        "Centre d'aide et de configuration du bot STG FR.\n"
+        "Sélectionne une catégorie ci-dessous pour afficher ses commandes."
+    ))
+    container.add_item(ui.Separator())
+
+    if section_key in HELP_SECTIONS:
+        title, subtitle, commands_text = HELP_SECTIONS[section_key]
+        container.add_item(ui.TextDisplay(
+            f"## {title}\n{subtitle}\n\n{commands_text}"
+        ))
+    else:
+        container.add_item(ui.TextDisplay(
+            "## 🛡️ Sécurité\n"
+            "Anti-link, anti-raid, Anti-MrBeast et protections automatiques."
+        ))
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(
+            "## 🔨 Modération\n"
+            "Ban, kick, mute, avertissements et gestion du serveur."
+        ))
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(
+            "## ⚙️ Utilitaires\n"
+            "Statistiques, informations, avatars et outils pratiques."
+        ))
+        container.add_item(ui.Separator())
+        container.add_item(ui.TextDisplay(
+            "## 📦 Systèmes\n"
+            "Logs, VIP, AutoPing, GhostPing et autres configurations."
+        ))
+
+    container.add_item(ui.Separator())
+    container.add_item(ui.TextDisplay(
+        "-# STG FR • Sécurité • Utilise les boutons pour naviguer"
+    ))
+    return container
+
+
+class STGHelpView(ui.LayoutView):
+    def __init__(self, section_key: str | None = None):
+        super().__init__(timeout=300)
+        self.section_key = section_key
+        self.add_item(_help_container(section_key))
+
+        row1 = ui.ActionRow()
+        row1.add_item(ui.Button(label="Sécurité", emoji="🛡️", style=discord.ButtonStyle.secondary, custom_id="stg_help_security"))
+        row1.add_item(ui.Button(label="Modération", emoji="🔨", style=discord.ButtonStyle.secondary, custom_id="stg_help_moderation"))
+        row1.add_item(ui.Button(label="Utilitaires", emoji="⚙️", style=discord.ButtonStyle.secondary, custom_id="stg_help_utility"))
+        row1.add_item(ui.Button(label="Systèmes", emoji="📦", style=discord.ButtonStyle.secondary, custom_id="stg_help_systems"))
+        self.add_item(row1)
+
+        row2 = ui.ActionRow()
+        row2.add_item(ui.Button(label="Accueil", emoji="🏠", style=discord.ButtonStyle.secondary, custom_id="stg_help_home"))
+        row2.add_item(ui.Button(label="Toutes les commandes", emoji="📋", style=discord.ButtonStyle.primary, custom_id="stg_help_all"))
+        row2.add_item(ui.Button(label="Fermer", emoji="✖️", style=discord.ButtonStyle.danger, custom_id="stg_help_close"))
+        self.add_item(row2)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        cid = (interaction.data or {}).get("custom_id", "")
+        mapping = {
+            "stg_help_security": "security",
+            "stg_help_moderation": "moderation",
+            "stg_help_utility": "utility",
+            "stg_help_systems": "systems",
+            "stg_help_home": None,
+        }
+
+        if cid in mapping:
+            await interaction.response.edit_message(view=STGHelpView(mapping[cid]))
+            return False
+
+        if cid == "stg_help_all":
+            command_names = sorted({f"+{cmd.qualified_name}" for cmd in bot.commands if not cmd.hidden})
+            text = " ".join(f"`{name}`" for name in command_names)
+            if len(text) > 3800:
+                text = text[:3790] + "…"
+            view = ui.LayoutView(timeout=300)
+            c = ui.Container(accent_colour=discord.Colour.from_str("#111111"))
+            c.add_item(ui.TextDisplay(f"# 📋 Toutes les commandes\n{text}"))
+            c.add_item(ui.Separator())
+            c.add_item(ui.TextDisplay("-# STG FR • Centre d'aide"))
+            view.add_item(c)
+            back = ui.ActionRow()
+            back.add_item(ui.Button(label="Retour", emoji="↩️", style=discord.ButtonStyle.secondary, custom_id="stg_help_home"))
+            view.add_item(back)
+            await interaction.response.edit_message(view=view)
+            return False
+
+        if cid == "stg_help_close":
+            await interaction.response.edit_message(content="Panel d'aide fermé.", view=None)
+            return False
+
+        return True
+
+
+@bot.tree.command(name="help", description="Afficher le centre d'aide STG Sécurité")
+async def slash_help(interaction: discord.Interaction):
+    if not STG_HELP_BANNER_PATH.exists():
+        await interaction.response.send_message(
+            "❌ Le fichier `stg_securite_help.png` est introuvable à côté de `bot.py`.",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.send_message(
+        file=discord.File(STG_HELP_BANNER_PATH, filename="stg_securite_help.png"),
+        view=STGHelpView(),
+        ephemeral=True,
+    )
+
+
 
 
 @bot.event
