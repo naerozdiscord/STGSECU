@@ -2817,9 +2817,11 @@ HELP_SECTIONS = {
 
 
 def _help_container(section_key: str | None = None):
-    container = ui.Container(accent_colour=discord.Colour.from_str("#111111"))
+    """Construit le panneau +help compact, inspiré du rendu BadgeX."""
+    container = ui.Container(accent_colour=discord.Colour.from_str("#333333"))
 
-    # Bannière panoramique, comme le panneau de référence.
+    # Bannière compacte. Le fichier est préparé dans un format plus panoramique
+    # afin d'occuper moins de hauteur dans Discord, comme sur le panneau BadgeX.
     container.add_item(
         ui.MediaGallery(
             discord.MediaGalleryItem("attachment://stgfr_securite_help.png")
@@ -2828,41 +2830,53 @@ def _help_container(section_key: str | None = None):
 
     container.add_item(ui.TextDisplay(
         "# STG Sécurité\n"
-        "Centre d'aide et de configuration du bot STG FR.\n"
-        "Sélectionne une catégorie ci-dessous pour afficher ses commandes."
+        "Protection, modération et outils de gestion pour **STG FR**."
     ))
-    container.add_item(ui.Separator())
+    container.add_item(ui.Separator(visible=True))
 
     if section_key in HELP_SECTIONS:
         title, subtitle, commands_text = HELP_SECTIONS[section_key]
-        container.add_item(ui.TextDisplay(
-            f"## {title}\n{subtitle}\n\n{commands_text}"
-        ))
-    else:
-        container.add_item(ui.TextDisplay(
-            "## 🛡️ Sécurité\n"
-            "Anti-link, anti-raid, Anti-MrBeast et protections automatiques."
-        ))
-        container.add_item(ui.Separator())
-        container.add_item(ui.TextDisplay(
-            "## 🔨 Modération\n"
-            "Ban, kick, mute, avertissements et gestion du serveur."
-        ))
-        container.add_item(ui.Separator())
-        container.add_item(ui.TextDisplay(
-            "## ⚙️ Utilitaires\n"
-            "Statistiques, informations, avatars et outils pratiques."
-        ))
-        container.add_item(ui.Separator())
-        container.add_item(ui.TextDisplay(
-            "## 📦 Systèmes\n"
-            "Logs, VIP, AutoPing, GhostPing et autres configurations."
-        ))
+        container.add_item(ui.TextDisplay(f"## {title}\n{subtitle}"))
+        container.add_item(ui.TextDisplay(commands_text))
+        container.add_item(ui.Separator(visible=True))
 
-    container.add_item(ui.Separator())
-    container.add_item(ui.TextDisplay(
-        "-# STG FR • Sécurité • Utilise les boutons pour naviguer"
-    ))
+        footer = ui.ActionRow()
+        footer.add_item(ui.Button(label="Accueil", emoji="🏠", style=discord.ButtonStyle.secondary, custom_id="stg_help_home"))
+        footer.add_item(ui.Button(label="Commandes", emoji="📋", style=discord.ButtonStyle.secondary, custom_id="stg_help_all"))
+        footer.add_item(ui.Button(label="Fermer", emoji="✖️", style=discord.ButtonStyle.danger, custom_id="stg_help_close"))
+        container.add_item(footer)
+        container.add_item(ui.TextDisplay("-# STG FR • Centre d'aide"))
+        return container
+
+    # Accueil : une ligne par catégorie avec son bouton à droite,
+    # comme les lignes « Configure » de BadgeX.
+    sections = [
+        ("🛡️ Sécurité", "Anti-link, anti-raid, Anti-MrBeast et protections automatiques.", "stg_help_security"),
+        ("🔨 Modération", "Ban, kick, mute, avertissements et gestion des membres.", "stg_help_moderation"),
+        ("⚙️ Utilitaires", "Statistiques, informations, avatars et outils pratiques.", "stg_help_utility"),
+        ("📦 Systèmes", "Logs, VIP, AutoPing, GhostPing et configurations STG.", "stg_help_systems"),
+    ]
+
+    for index, (title, description, custom_id) in enumerate(sections):
+        container.add_item(ui.Section(
+            ui.TextDisplay(f"**{title}**\n{description}"),
+            accessory=ui.Button(
+                label="Afficher",
+                emoji="🔧",
+                style=discord.ButtonStyle.secondary,
+                custom_id=custom_id,
+            ),
+        ))
+        if index != len(sections) - 1:
+            container.add_item(ui.Separator(visible=True))
+
+    container.add_item(ui.Separator(visible=True))
+    footer = ui.ActionRow()
+    footer.add_item(ui.Button(label="Commandes", emoji="📋", style=discord.ButtonStyle.secondary, custom_id="stg_help_all"))
+    footer.add_item(ui.Button(label="FAQ", emoji="❓", style=discord.ButtonStyle.secondary, custom_id="stg_help_faq"))
+    footer.add_item(ui.Button(label="Fermer", emoji="✖️", style=discord.ButtonStyle.danger, custom_id="stg_help_close"))
+    container.add_item(footer)
+    container.add_item(ui.TextDisplay("-# STG FR • Sécurité"))
     return container
 
 
@@ -2871,19 +2885,6 @@ class STGHelpView(ui.LayoutView):
         super().__init__(timeout=300)
         self.section_key = section_key
         self.add_item(_help_container(section_key))
-
-        row1 = ui.ActionRow()
-        row1.add_item(ui.Button(label="Sécurité", emoji="🛡️", style=discord.ButtonStyle.secondary, custom_id="stg_help_security"))
-        row1.add_item(ui.Button(label="Modération", emoji="🔨", style=discord.ButtonStyle.secondary, custom_id="stg_help_moderation"))
-        row1.add_item(ui.Button(label="Utilitaires", emoji="⚙️", style=discord.ButtonStyle.secondary, custom_id="stg_help_utility"))
-        row1.add_item(ui.Button(label="Systèmes", emoji="📦", style=discord.ButtonStyle.secondary, custom_id="stg_help_systems"))
-        self.add_item(row1)
-
-        row2 = ui.ActionRow()
-        row2.add_item(ui.Button(label="Accueil", emoji="🏠", style=discord.ButtonStyle.secondary, custom_id="stg_help_home"))
-        row2.add_item(ui.Button(label="Toutes les commandes", emoji="📋", style=discord.ButtonStyle.primary, custom_id="stg_help_all"))
-        row2.add_item(ui.Button(label="Fermer", emoji="✖️", style=discord.ButtonStyle.danger, custom_id="stg_help_close"))
-        self.add_item(row2)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         cid = (interaction.data or {}).get("custom_id", "")
@@ -2902,17 +2903,35 @@ class STGHelpView(ui.LayoutView):
         if cid == "stg_help_all":
             command_names = sorted({f"+{cmd.qualified_name}" for cmd in bot.commands if not cmd.hidden})
             text = " ".join(f"`{name}`" for name in command_names)
-            if len(text) > 3800:
-                text = text[:3790] + "…"
+            if len(text) > 3600:
+                text = text[:3590] + "…"
             view = ui.LayoutView(timeout=300)
-            c = ui.Container(accent_colour=discord.Colour.from_str("#111111"))
-            c.add_item(ui.TextDisplay(f"# 📋 Toutes les commandes\n{text}"))
-            c.add_item(ui.Separator())
+            c = ui.Container(accent_colour=discord.Colour.from_str("#333333"))
+            c.add_item(ui.TextDisplay(f"# 📋 Commandes STG\n{text}"))
+            c.add_item(ui.Separator(visible=True))
+            row = ui.ActionRow()
+            row.add_item(ui.Button(label="Accueil", emoji="🏠", style=discord.ButtonStyle.secondary, custom_id="stg_help_home"))
+            row.add_item(ui.Button(label="Fermer", emoji="✖️", style=discord.ButtonStyle.danger, custom_id="stg_help_close"))
+            c.add_item(row)
             c.add_item(ui.TextDisplay("-# STG FR • Centre d'aide"))
             view.add_item(c)
-            back = ui.ActionRow()
-            back.add_item(ui.Button(label="Retour", emoji="↩️", style=discord.ButtonStyle.secondary, custom_id="stg_help_home"))
-            view.add_item(back)
+            await interaction.response.edit_message(view=view)
+            return False
+
+        if cid == "stg_help_faq":
+            view = ui.LayoutView(timeout=300)
+            c = ui.Container(accent_colour=discord.Colour.from_str("#333333"))
+            c.add_item(ui.TextDisplay(
+                "# ❓ FAQ\n"
+                "**Comment voir les commandes ?**\nClique sur une catégorie ou sur **Commandes**.\n\n"
+                "**Qui peut utiliser les commandes de configuration ?**\n"
+                "Les commandes sensibles sont réservées aux membres possédant les permissions nécessaires."
+            ))
+            c.add_item(ui.Separator(visible=True))
+            row = ui.ActionRow()
+            row.add_item(ui.Button(label="Accueil", emoji="🏠", style=discord.ButtonStyle.secondary, custom_id="stg_help_home"))
+            c.add_item(row)
+            view.add_item(c)
             await interaction.response.edit_message(view=view)
             return False
 
