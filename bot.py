@@ -2822,7 +2822,7 @@ def _help_container(section_key: str | None = None):
     # Bannière panoramique, comme le panneau de référence.
     container.add_item(
         ui.MediaGallery(
-            ui.MediaGalleryItem("attachment://stgfr_securite_help.png")
+            discord.MediaGalleryItem("attachment://stgfr_securite_help.png")
         )
     )
 
