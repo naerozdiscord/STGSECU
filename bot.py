@@ -2862,7 +2862,7 @@ def _help_container(section_key: str | None = None):
             ui.TextDisplay(f"**{title}**\n{description}"),
             accessory=ui.Button(
                 label="Afficher",
-                emoji="🔧",
+                emoji="<:11_lien:1563318320734670868>",
                 style=discord.ButtonStyle.secondary,
                 custom_id=custom_id,
             ),
@@ -2872,9 +2872,9 @@ def _help_container(section_key: str | None = None):
 
     container.add_item(ui.Separator(visible=True))
     footer = ui.ActionRow()
-    footer.add_item(ui.Button(label="Commandes", emoji="📋", style=discord.ButtonStyle.secondary, custom_id="stg_help_all"))
-    footer.add_item(ui.Button(label="FAQ", emoji="❓", style=discord.ButtonStyle.secondary, custom_id="stg_help_faq"))
-    footer.add_item(ui.Button(label="Fermer", emoji="✖️", style=discord.ButtonStyle.danger, custom_id="stg_help_close"))
+    footer.add_item(ui.Button(label="Commandes", emoji="<:08_document:1563318269325086891>", style=discord.ButtonStyle.secondary, custom_id="stg_help_all"))
+    footer.add_item(ui.Button(label="FAQ", emoji="<:10_aide:1563318305228328970>", style=discord.ButtonStyle.secondary, custom_id="stg_help_faq"))
+    footer.add_item(ui.Button(label="Fermer", emoji="<:15_supprimer:1563318390440071239>", style=discord.ButtonStyle.danger, custom_id="stg_help_close"))
     container.add_item(footer)
     container.add_item(ui.TextDisplay("-# STG FR • Sécurité"))
     return container
