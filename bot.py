@@ -62,7 +62,7 @@ intents.presences = True  # Pour +stats : compter les membres en ligne (à activ
 intents.moderation = True  # Pour les logs de bans / débans
 intents.message_content = True  # Pour pouvoir lire les messages
 
-bot = commands.Bot(command_prefix="+", intents=intents)
+bot = commands.Bot(command_prefix="+", intents=intents, help_command=None)
 
 
 
@@ -2769,7 +2769,7 @@ async def before_ghostping_scheduler():
 # ============================================================
 # /help — PANNEAU D'AIDE STG SÉCURITÉ (COMPONENTS V2)
 # ============================================================
-STG_HELP_BANNER_PATH = Path(__file__).parent / "stg_securite_help.png"
+STG_HELP_BANNER_PATH = Path(__file__).parent / "stgfr_securite_help.png"
 
 HELP_SECTIONS = {
     "security": (
@@ -2822,7 +2822,7 @@ def _help_container(section_key: str | None = None):
     # Bannière panoramique, comme le panneau de référence.
     container.add_item(
         ui.MediaGallery(
-            ui.MediaGalleryItem("attachment://stg_securite_help.png")
+            ui.MediaGalleryItem("attachment://stgfr_securite_help.png")
         )
     )
 
@@ -2923,17 +2923,31 @@ class STGHelpView(ui.LayoutView):
         return True
 
 
+@bot.command(name="help")
+async def prefix_help(ctx):
+    """Affiche le centre d'aide STG Sécurité en Components V2 avec +help."""
+    if not STG_HELP_BANNER_PATH.exists():
+        await ctx.send("❌ Le fichier `stgfr_securite_help.png` est introuvable à côté de `bot.py`.")
+        return
+
+    await ctx.send(
+        file=discord.File(STG_HELP_BANNER_PATH, filename="stgfr_securite_help.png"),
+        view=STGHelpView(),
+        allowed_mentions=discord.AllowedMentions.none(),
+    )
+
+
 @bot.tree.command(name="help", description="Afficher le centre d'aide STG Sécurité")
 async def slash_help(interaction: discord.Interaction):
     if not STG_HELP_BANNER_PATH.exists():
         await interaction.response.send_message(
-            "❌ Le fichier `stg_securite_help.png` est introuvable à côté de `bot.py`.",
+            "❌ Le fichier `stgfr_securite_help.png` est introuvable à côté de `bot.py`.",
             ephemeral=True,
         )
         return
 
     await interaction.response.send_message(
-        file=discord.File(STG_HELP_BANNER_PATH, filename="stg_securite_help.png"),
+        file=discord.File(STG_HELP_BANNER_PATH, filename="stgfr_securite_help.png"),
         view=STGHelpView(),
         ephemeral=True,
     )
