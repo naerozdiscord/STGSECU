@@ -2773,7 +2773,7 @@ STG_HELP_BANNER_PATH = Path(__file__).parent / "stgfr_securite_help.png"
 
 HELP_SECTIONS = {
     "security": (
-        "🛡️ SÉCURITÉ",
+        "<:b5643727de6942a28d0b29fe3b7ee4c0:1563318410417537105> SÉCURITÉ",
         "Protection et prévention du serveur.",
         "`+antilink` — Protection contre les liens / invitations\n"
         "`+antiraid` — Configuration de l'anti-raid\n"
@@ -2782,7 +2782,7 @@ HELP_SECTIONS = {
         "`+autoping` — Messages automatiques à l'arrivée d'un membre",
     ),
     "moderation": (
-        "🔨 MODÉRATION",
+        "<:f8da6b48e7084ec4934a7cfa7e2a8e9d:1563318431225356428> MODÉRATION",
         "Commandes destinées à la gestion des membres.",
         "`+ban` — Bannir un membre\n"
         "`+kick` — Expulser un membre\n"
@@ -2793,7 +2793,7 @@ HELP_SECTIONS = {
         "`+lockdown` — Verrouiller un salon",
     ),
     "utility": (
-        "⚙️ UTILITAIRES",
+        "<:05_statistiques:1563318210193915955> UTILITAIRES",
         "Informations et outils pratiques.",
         "`+stats` — Statistiques Components V2\n"
         "`+ping` — Latence du bot\n"
@@ -2804,7 +2804,7 @@ HELP_SECTIONS = {
         "`+uptime` — Temps d'activité du bot",
     ),
     "systems": (
-        "📦 SYSTÈMES",
+        "<:04_parametres:1563318191453638756> SYSTÈMES",
         "Configuration des principaux systèmes STG.",
         "`+setup_logs` — Configurer les salons de logs\n"
         "`+setup_vip_access` — Installer le panneau VIP\n"
@@ -2851,10 +2851,10 @@ def _help_container(section_key: str | None = None):
     # Accueil : une ligne par catégorie avec son bouton à droite,
     # comme les lignes « Configure » de BadgeX.
     sections = [
-        ("🛡️ Sécurité", "Anti-link, anti-raid, Anti-MrBeast et protections automatiques.", "stg_help_security"),
-        ("🔨 Modération", "Ban, kick, mute, avertissements et gestion des membres.", "stg_help_moderation"),
-        ("⚙️ Utilitaires", "Statistiques, informations, avatars et outils pratiques.", "stg_help_utility"),
-        ("📦 Systèmes", "Logs, VIP, AutoPing, GhostPing et configurations STG.", "stg_help_systems"),
+        ("<:b5643727de6942a28d0b29fe3b7ee4c0:1563318410417537105> Sécurité", "Anti-link, anti-raid, Anti-MrBeast et protections automatiques.", "stg_help_security"),
+        ("<:f8da6b48e7084ec4934a7cfa7e2a8e9d:1563318431225356428> Modération", "Ban, kick, mute, avertissements et gestion des membres.", "stg_help_moderation"),
+        ("<:05_statistiques:1563318210193915955> Utilitaires", "Statistiques, informations, avatars et outils pratiques.", "stg_help_utility"),
+        ("<:04_parametres:1563318191453638756> Systèmes", "Logs, VIP, AutoPing, GhostPing et configurations STG.", "stg_help_systems"),
     ]
 
     for index, (title, description, custom_id) in enumerate(sections):
@@ -2907,7 +2907,7 @@ class STGHelpView(ui.LayoutView):
                 text = text[:3590] + "…"
             view = ui.LayoutView(timeout=300)
             c = ui.Container(accent_colour=discord.Colour.from_str("#333333"))
-            c.add_item(ui.TextDisplay(f"# 📋 Commandes STG\n{text}"))
+            c.add_item(ui.TextDisplay(f"# <:08_document:1563318269325086891> Commandes STG\n{text}"))
             c.add_item(ui.Separator(visible=True))
             row = ui.ActionRow()
             row.add_item(ui.Button(label="Accueil", emoji="🏠", style=discord.ButtonStyle.secondary, custom_id="stg_help_home"))
@@ -2922,7 +2922,7 @@ class STGHelpView(ui.LayoutView):
             view = ui.LayoutView(timeout=300)
             c = ui.Container(accent_colour=discord.Colour.from_str("#333333"))
             c.add_item(ui.TextDisplay(
-                "# ❓ FAQ\n"
+                "# <:10_aide:1563318305228328970> FAQ\n"
                 "**Comment voir les commandes ?**\nClique sur une catégorie ou sur **Commandes**.\n\n"
                 "**Qui peut utiliser les commandes de configuration ?**\n"
                 "Les commandes sensibles sont réservées aux membres possédant les permissions nécessaires."
