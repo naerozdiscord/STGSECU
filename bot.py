@@ -459,6 +459,7 @@ async def liste(ctx):
             "`+server_emojis` → Liste les emojis du serveur.\n"
             "`+setup_logs` → Crée/configure les salons de logs.\n"
             "`+autoping` → Configure les messages automatiques à l’arrivée.\n"
+            "`+mrbeast` → Configure la protection contre les messages de 4 images.\n"
             "`+emoji add <:nom:ID>` → Importe un emoji personnalisé dans ce serveur.\n"
             "`+uptime` → Affiche le temps de fonctionnement du bot.\n"
             "`+liste` → Affiche cette liste des commandes."
@@ -1278,6 +1279,205 @@ async def logs_automod_action(execution):
     if execution.channel_id:
         embed.add_field(name="Salon", value=f"<#{execution.channel_id}>", inline=True)
     await send_log(guild, "automods", embed)
+
+
+
+# ============================================================
+# PROTECTION ANTI "MRBEAST" - 4 IMAGES EXACTEMENT
+# Commande : +mrbeast
+# ============================================================
+
+MRBEAST_CONFIG_FILE = Path(__file__).parent / "mrbeast_config.json"
+MRBEAST_LOGO_PATH = Path(__file__).parent / "stgfr_mrbeast.png"
+MRBEAST_IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".gif")
+
+
+def load_mrbeast_config():
+    try:
+        if MRBEAST_CONFIG_FILE.exists():
+            raw = json.loads(MRBEAST_CONFIG_FILE.read_text(encoding="utf-8"))
+            return {
+                str(guild_id): {int(channel_id) for channel_id in channel_ids}
+                for guild_id, channel_ids in raw.items()
+            }
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as error:
+        print(f"⚠️ Impossible de charger la protection Anti-MrBeast : {error}")
+    return {}
+
+
+mrbeast_config = load_mrbeast_config()
+
+
+def save_mrbeast_config():
+    try:
+        data = {guild_id: sorted(channel_ids) for guild_id, channel_ids in mrbeast_config.items()}
+        MRBEAST_CONFIG_FILE.write_text(
+            json.dumps(data, indent=2, ensure_ascii=False),
+            encoding="utf-8"
+        )
+    except OSError as error:
+        print(f"⚠️ Impossible d'enregistrer la protection Anti-MrBeast : {error}")
+
+
+def mrbeast_is_enabled(guild_id: int, channel_id: int) -> bool:
+    return channel_id in mrbeast_config.get(str(guild_id), set())
+
+
+def mrbeast_set_enabled(guild_id: int, channel_id: int, enabled: bool):
+    channels = mrbeast_config.setdefault(str(guild_id), set())
+    if enabled:
+        channels.add(channel_id)
+    else:
+        channels.discard(channel_id)
+        if not channels:
+            mrbeast_config.pop(str(guild_id), None)
+    save_mrbeast_config()
+
+
+def mrbeast_is_image(attachment: discord.Attachment) -> bool:
+    content_type = (attachment.content_type or "").lower()
+    filename = attachment.filename.lower()
+    return content_type.startswith("image/") or filename.endswith(MRBEAST_IMAGE_EXTENSIONS)
+
+
+class MrBeastEnableButton(discord.ui.Button):
+    def __init__(self, panel):
+        self.panel = panel
+        super().__init__(
+            label="ACTIVER LA PROTECTION",
+            emoji="🛡️",
+            style=discord.ButtonStyle.success,
+            custom_id="mrbeast:enable"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.panel.owner_id or not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ Ce panel est réservé à l'administrateur qui l'a ouvert.", ephemeral=True)
+            return
+        mrbeast_set_enabled(interaction.guild.id, self.panel.channel.id, True)
+        await interaction.response.edit_message(
+            view=MrBeastPanel(self.panel.owner_id, self.panel.channel, notice=f"✅ **{self.panel.channel.mention} est désormais protégé contre le spam de 4 images.**")
+        )
+
+
+class MrBeastDisableButton(discord.ui.Button):
+    def __init__(self, panel):
+        self.panel = panel
+        super().__init__(
+            label="DÉSACTIVER",
+            emoji="⛔",
+            style=discord.ButtonStyle.danger,
+            custom_id="mrbeast:disable"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.panel.owner_id or not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ Ce panel est réservé à l'administrateur qui l'a ouvert.", ephemeral=True)
+            return
+        mrbeast_set_enabled(interaction.guild.id, self.panel.channel.id, False)
+        await interaction.response.edit_message(
+            view=MrBeastPanel(self.panel.owner_id, self.panel.channel, notice=f"🔓 **Protection désactivée dans {self.panel.channel.mention}.**")
+        )
+
+
+class MrBeastPanel(discord.ui.LayoutView):
+    def __init__(self, owner_id: int, channel: discord.TextChannel, notice: str = None):
+        super().__init__(timeout=900)
+        self.owner_id = owner_id
+        self.channel = channel
+        self.notice = notice
+        self._build()
+
+    def _build(self):
+        enabled = mrbeast_is_enabled(self.channel.guild.id, self.channel.id)
+        status = "🟢 **ACTIVÉE**" if enabled else "🔴 **DÉSACTIVÉE**"
+
+        container = discord.ui.Container(accent_colour=discord.Colour.from_str("#000000"))
+        container.add_item(discord.ui.Section(
+            discord.ui.TextDisplay(
+                "# 🛡️ PROTECTION ANTI MRBEAST\n"
+                "Protection anti-spam contre les messages suspects composés de **4 images exactement**."
+            ),
+            accessory=discord.ui.Thumbnail("attachment://stgfr_mrbeast.png")
+        ))
+        container.add_item(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.large))
+        container.add_item(discord.ui.TextDisplay(
+            f"## ⚙️ Configuration actuelle\n"
+            f"**Salon protégé :** {self.channel.mention}\n"
+            f"**État :** {status}\n\n"
+            "Dès qu'un membre envoie **exactement 4 images dans un seul message**, "
+            "le bot supprime immédiatement le message."
+        ))
+        container.add_item(discord.ui.Separator(visible=True))
+        container.add_item(discord.ui.TextDisplay(
+            "## 🔒 Fonctionnement\n"
+            "• **4 images exactement** → message supprimé immédiatement\n"
+            "• 1, 2 ou 3 images → ce filtre ne supprime pas le message\n"
+            "• 5 images ou plus → ce filtre ne supprime pas le message\n"
+            "• La configuration est sauvegardée après les redémarrages du bot\n\n"
+            "-# Cette protection vise le format de spam utilisé par certaines campagnes de comptes compromis. Elle ne détermine pas si une image est réellement liée à MrBeast ou à une arnaque."
+        ))
+        if self.notice:
+            container.add_item(discord.ui.Separator(visible=True))
+            container.add_item(discord.ui.TextDisplay(self.notice))
+        container.add_item(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.large))
+        container.add_item(discord.ui.ActionRow(
+            MrBeastEnableButton(self),
+            MrBeastDisableButton(self)
+        ))
+        container.add_item(discord.ui.TextDisplay("-# STG FR • Sécurité automatique"))
+        self.add_item(container)
+
+
+@bot.command(name="mrbeast")
+@commands.has_permissions(administrator=True)
+async def mrbeast(ctx):
+    """Configure la protection contre les messages contenant exactement quatre images dans le salon actuel."""
+    if ctx.guild is None or not isinstance(ctx.channel, discord.TextChannel):
+        return
+
+    if not MRBEAST_LOGO_PATH.exists():
+        await ctx.send("❌ Le fichier `stgfr_mrbeast.png` doit être placé à côté de `bot.py`.")
+        return
+
+    await ctx.send(
+        view=MrBeastPanel(ctx.author.id, ctx.channel),
+        file=discord.File(MRBEAST_LOGO_PATH, filename="stgfr_mrbeast.png"),
+        allowed_mentions=discord.AllowedMentions.none()
+    )
+
+    try:
+        await ctx.message.delete()
+    except (discord.Forbidden, discord.HTTPException):
+        pass
+
+
+@bot.listen("on_message")
+async def mrbeast_four_image_protection(message: discord.Message):
+    if message.guild is None or message.author.bot:
+        return
+    if not mrbeast_is_enabled(message.guild.id, message.channel.id):
+        return
+
+    images = [attachment for attachment in message.attachments if mrbeast_is_image(attachment)]
+
+    # "Seulement 4 images" : le message doit contenir exactement 4 pièces jointes,
+    # et les 4 doivent être des images.
+    if len(message.attachments) != 4 or len(images) != 4:
+        return
+
+    try:
+        await message.delete()
+        await message.channel.send(
+            f"🛡️ {message.author.mention} **message supprimé par la protection Anti-MrBeast.**\n"
+            "Le filtre de sécurité a détecté un message contenant exactement **4 images**.",
+            delete_after=6,
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False)
+        )
+    except discord.Forbidden:
+        print(f"⚠️ Anti-MrBeast : permission insuffisante dans #{message.channel}.")
+    except discord.HTTPException as error:
+        print(f"⚠️ Anti-MrBeast : suppression impossible : {error}")
 
 
 # ============================================================
