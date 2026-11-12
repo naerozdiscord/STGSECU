@@ -65,10 +65,6 @@ intents.message_content = True  # Pour pouvoir lire les messages
 bot = commands.Bot(command_prefix="+", intents=intents, help_command=None)
 
 
-
-    
-
-
 # Fonction pour créer un embed vert
 def create_embed(title, description):
     embed = discord.Embed(title=title, description=description, color=0x00FF00)  # Couleur verte
@@ -115,22 +111,6 @@ async def move(ctx, member: discord.Member, channel: discord.VoiceChannel):
     await member.move_to(channel)
     await ctx.send(embed=create_embed("Membre déplacé", f"{member} a été déplacé vers {channel}"))
 
-# Commande pour muter temporairement un membre
-@bot.command()
-@commands.has_permissions(manage_messages=True)
-async def tempmute(ctx, member: discord.Member, duration: int):
-    mute_role = get(ctx.guild.roles, name="Muted")
-    
-    if not mute_role:
-        perms = discord.Permissions(send_messages=False, speak=False)
-        mute_role = await ctx.guild.create_role(name="Muted", permissions=perms)
-
-    await member.add_roles(mute_role)
-    await ctx.send(f"🔇 {member.mention} a été muté pour {duration} minutes.")
-
-    await asyncio.sleep(duration * 60)
-    await member.remove_roles(mute_role)
-    await ctx.send(f"🔊 {member.mention} n'est plus muté.")
 
 @bot.command()
 @commands.has_permissions(manage_messages=True)
@@ -399,13 +379,10 @@ async def liste(ctx):
     # Catégorie : 🛡️ Commandes Anti-Raid
     embed.add_field(
         name="🛡️ Commandes Anti-Raid",
-        value=( 
-            "`+antiraid on` → Active la protection anti-raid.\n"
-            "`+antiraid off` → Désactive la protection anti-raid.\n"
+        value=(
+            "`+antiraid` → Ouvre le menu pour activer/désactiver la protection anti-raid.\n"
             "`+antilink on/off` → Active ou désactive la protection anti-liens et anti-spam.\n"
-            "🛑 Bloque les comptes récents (-7 jours).\n"
-            "⏳ Expulse les spammeurs (5 messages/5 sec).\n"
-            "⚠️ Supprime les messages avec trop de mentions (+5)."
+            "🛑 Bloque les comptes récents (-7 jours)."
         ),
         inline=False
     )
@@ -424,7 +401,7 @@ async def liste(ctx):
         "`+warn @user [raison]` → Avertit un membre.\n"
         "`+check_warns @user` → Vérifie les avertissements d'un membre.\n"
         "`+tempban @user <durée en h> [raison]` → Banni temporairement un membre.\n"
-        "`+mute @user [raison] [durée]` → Muter un membre pour une durée donnée.\n"
+        "`+mute @user <minutes> [raison]` → Mute (timeout Discord) un membre.\n"
         "`+unmute @user` → Dé-muter un membre.\n"
         "`+lockdown <temps en min>` → Verrouille un salon.\n"
         "`+private_channel <nom_du_salon> @membre` → Crée un salon privé pour un utilisateur spécifique.\n"
@@ -451,7 +428,7 @@ async def liste(ctx):
     # Catégorie : 🎲 Commandes Diverses
     embed.add_field(
         name="🎲 Commandes Diverses",
-        value=( 
+        value=(
             "`+ping` → Vérifie si le bot est en ligne.\n"
             "`+info @user` → Affiche des infos sur un membre.\n"
             "`+avatar @user` → Affiche l'avatar d'un membre.\n"
@@ -473,13 +450,7 @@ async def liste(ctx):
     await ctx.send(embed=embed)
 
 
-
-
-
-
-
 # Commande antiraid
-from discord.ui import View, Button, button
 anti_raid_enabled = False  # On initialise la variable à False
 
 
@@ -512,7 +483,7 @@ async def on_member_join(member):
     global anti_raid_enabled  # On indique qu'on utilise la variable globale
 
     if anti_raid_enabled:
-        account_age = datetime.utcnow() - member.created_at
+        account_age = discord.utils.utcnow() - member.created_at
         if account_age < timedelta(days=7):  # Compte de moins de 7 jours
             await member.kick(reason="Compte trop récent - Protection anti-raid")
             channel = discord.utils.get(member.guild.text_channels, name="logs")
@@ -520,15 +491,6 @@ async def on_member_join(member):
                 await channel.send(f"🚨 **{member.name}** a été expulsé (compte trop récent)")
 
 
-
-
-
-
-    
-
-
-
- 
 # Commande pour afficher des informations sur un utilisateur
 @bot.command()
 async def info(ctx, member: discord.Member):
@@ -539,13 +501,13 @@ async def info(ctx, member: discord.Member):
 
     # Utilisation de display_avatar pour obtenir l'avatar du membre
     embed.set_thumbnail(url=member.display_avatar.url)
-    
+
     # Ajout d'autres informations sur le membre
     embed.add_field(name="Nom", value=member.name)
     embed.add_field(name="ID", value=member.id)
     embed.add_field(name="Créé le", value=member.created_at.strftime("%d/%m/%Y"))
     embed.add_field(name="Rejoint le", value=member.joined_at.strftime("%d/%m/%Y"))
-    
+
     # Envoi de l'embed dans le chat
     await ctx.send(embed=embed)
 
@@ -575,7 +537,7 @@ async def server_stats(ctx):
     total_channels = len(server.text_channels) + len(server.voice_channels)
     total_roles = len(server.roles)
     total_emojis = len(server.emojis)
-    
+
     embed = discord.Embed(
         title=f"Statistiques de {server.name}",
         color=discord.Color.purple()
@@ -585,7 +547,7 @@ async def server_stats(ctx):
     embed.add_field(name="Nombre de rôles", value=total_roles)
     embed.add_field(name="Nombre d'emojis", value=total_emojis)
     if server.icon:
-    embed.set_thumbnail(url=server.icon.url)
+        embed.set_thumbnail(url=server.icon.url)
     await ctx.send(embed=embed)
 
 
@@ -595,14 +557,15 @@ async def server_info(ctx):
     server = ctx.guild
     embed = discord.Embed(
         title=f"Informations sur le serveur {server.name}",
-        description=f"Voici quelques informations sur ce serveur.",
+        description="Voici quelques informations sur ce serveur.",
         color=discord.Color.green()
     )
     embed.add_field(name="Nom du serveur", value=server.name)
     embed.add_field(name="ID du serveur", value=server.id)
     embed.add_field(name="Créé le", value=server.created_at.strftime("%d/%m/%Y"))
     embed.add_field(name="Membres", value=len(server.members))
-    embed.set_thumbnail(url=server.icon.url)
+    if server.icon:
+        embed.set_thumbnail(url=server.icon.url)
     await ctx.send(embed=embed)
 
 
@@ -620,20 +583,12 @@ async def banlist(ctx):
     await ctx.send(embed=discord.Embed(title=f"Membres bannis ({len(bans)})", description=text, color=discord.Color.red()))
 
 
+@bot.command()
 async def uptime(ctx):
-    try:
-        # Vérification que start_time est bien défini
-        if hasattr(bot, 'start_time'):
-            uptime_duration = datetime.utcnow() - bot.start_time
-            hours, remainder = divmod(uptime_duration.seconds, 3600)
-            minutes, seconds = divmod(remainder, 60)
-            await ctx.send(f"⏳ Le bot est en ligne depuis {uptime_duration.days} jours, {hours} heures, {minutes} minutes et {seconds} secondes.")
-        else:
-            await ctx.send("Le temps de démarrage du bot n'est pas encore défini.")
-    except Exception as e:
-        # Gestion d'erreur générale pour éviter une exception non gérée
-        await ctx.send(f"Une erreur s'est produite : {e}")
-
+    delta = discord.utils.utcnow() - bot.start_time
+    hours, remainder = divmod(delta.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    await ctx.send(f"⏳ En ligne depuis {delta.days} jours, {hours} h, {minutes} min et {seconds} s.")
 
 
 # Commande pour voir Liste les emojis du serveur.
@@ -1523,6 +1478,7 @@ async def mrbeast_four_image_protection(message: discord.Message):
 
 @bot.event
 async def setup_hook():
+    bot.start_time = discord.utils.utcnow()
 
     # Panel persistant de configuration des logs
     bot.add_view(LogsConfigView())
@@ -1961,7 +1917,7 @@ class ProofReviewView(discord.ui.View):
         except discord.Forbidden:
             pass
 
-        # ========================================================
+    # ========================================================
     # REFUSER
     # ========================================================
 
@@ -2973,12 +2929,14 @@ class STGHelpView(ui.LayoutView):
             return False
 
         if cid == "stg_help_close":
-    view = ui.LayoutView(timeout=None)
-    c = ui.Container(accent_colour=discord.Colour.from_str("#333333"))
-    c.add_item(ui.TextDisplay("Panel d'aide fermé."))
-    view.add_item(c)
-    await interaction.response.edit_message(view=view)
-    return False
+            view = ui.LayoutView(timeout=None)
+            c = ui.Container(accent_colour=discord.Colour.from_str("#333333"))
+            c.add_item(ui.TextDisplay("Panel d'aide fermé."))
+            view.add_item(c)
+            await interaction.response.edit_message(view=view)
+            return False
+
+        return True
 
 
 @bot.command(name="help")
@@ -3069,6 +3027,9 @@ async def private_channel(ctx, name: str, member: discord.Member):
 async def on_ready():
     if not ghostping_scheduler.is_running():
         ghostping_scheduler.start()
+
+    if not tempban_checker.is_running():
+        tempban_checker.start()
 
     if not getattr(bot, "_slash_commands_synced", False):
         try:
