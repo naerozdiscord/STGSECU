@@ -4,6 +4,7 @@ import os
 import re
 import aiohttp
 import json
+import io
 from collections import defaultdict, deque
 from pathlib import Path
 from dotenv import load_dotenv
@@ -3021,6 +3022,72 @@ async def private_channel(ctx, name: str, member: discord.Member):
     }
     channel = await ctx.guild.create_text_channel(name, overwrites=overwrites, category=ctx.channel.category)
     await ctx.send(f"🔒 Salon privé créé : {channel.mention}")
+
+
+
+from PIL import Image, ImageDraw, ImageFont
+
+LOADING_GIF_URL = None  # optionnel : lien d'un gif de chargement pour l'icône
+
+
+def build_card_image(name: str, avatar_bytes: bytes) -> io.BytesIO:
+    """Génère l'image de la carte. Remplace le dessin par ton vrai design plus tard."""
+    img = Image.new("RGB", (1000, 560), (18, 18, 28))
+    draw = ImageDraw.Draw(img)
+
+    # Avatar rond
+    avatar = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA").resize((140, 140))
+    mask = Image.new("L", (140, 140), 0)
+    ImageDraw.Draw(mask).ellipse((0, 0, 140, 140), fill=255)
+    img.paste(avatar, (40, 40), mask)
+
+    font = ImageFont.load_default()  # remplace par ImageFont.truetype("police.ttf", 40)
+    draw.text((200, 70), name, fill=(255, 255, 255), font=font)
+    draw.text((200, 100), "STATUT", fill=(150, 150, 170), font=font)
+
+    buffer = io.BytesIO()
+    img.save(buffer, "PNG")
+    buffer.seek(0)
+    return buffer
+
+
+@bot.command(name="statut")
+async def statut(ctx, member: discord.Member = None):
+    member = member or ctx.author
+
+    # 1) Embed de chargement (barre verte, comme Statbot)
+    loading = discord.Embed(
+        description="Please wait. This won't take long!",
+        color=0x43B581
+    )
+    loading.set_author(
+        name="Loading...",
+        icon_url=LOADING_GIF_URL or bot.user.display_avatar.url
+    )
+    message = await ctx.reply(embed=loading, mention_author=False)
+
+    # 2) Génération de l'image (sans bloquer le bot)
+    try:
+        avatar_bytes = await member.display_avatar.replace(size=256, format="png").read()
+        image_buffer = await asyncio.to_thread(build_card_image, member.display_name, avatar_bytes)
+    except Exception as error:
+        print(f"ERREUR STATUT : {error!r}")
+        await message.edit(embed=discord.Embed(
+            description="❌ Impossible de générer la carte pour le moment.",
+            color=0xED4245
+        ))
+        return
+
+    # 3) On modifie le même message : embed + image
+    file = discord.File(image_buffer, filename="statut.png")
+    result = discord.Embed(color=0x2B2D31)
+    result.set_image(url="attachment://statut.png")
+    result.set_footer(text="STG Sécurité • Statut")
+
+    await message.edit(embed=result, attachments=[file])
+
+
+    
 
 
 @bot.event
