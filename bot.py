@@ -109,8 +109,11 @@ async def remove_role(ctx, member: discord.Member, role: discord.Role):
 @bot.command()
 @commands.has_permissions(move_members=True)
 async def move(ctx, member: discord.Member, channel: discord.VoiceChannel):
-    embed = create_embed("Membre déplacé", f"{member} a été déplacé vers {channel}")
-    await ctx.send(embed=embed)
+    if member.voice is None:
+        await ctx.send("❌ Ce membre n'est pas en vocal.")
+        return
+    await member.move_to(channel)
+    await ctx.send(embed=create_embed("Membre déplacé", f"{member} a été déplacé vers {channel}"))
 
 # Commande pour muter temporairement un membre
 @bot.command()
@@ -138,20 +141,19 @@ async def clear(ctx, amount: int):
 
 
 
-
 @bot.command()
 @commands.has_permissions(manage_channels=True)
 async def lockdown(ctx, time: int):
     """Verrouille un salon pendant un certain temps (en minutes)."""
-    overwrites = {
-        ctx.guild.default_role: discord.PermissionOverwrite(send_messages=False)
-    }
-    await ctx.channel.edit(overwrites=overwrites)
+    everyone = ctx.guild.default_role
+    previous = ctx.channel.overwrites_for(everyone).send_messages
+
+    await ctx.channel.set_permissions(everyone, send_messages=False)
     await ctx.send("🔒 Le salon est maintenant en lockdown.")
 
-    # Attendre la durée du lockdown, puis rétablir les permissions
     await asyncio.sleep(time * 60)
-    await ctx.channel.edit(overwrites={})
+
+    await ctx.channel.set_permissions(everyone, send_messages=previous)
     await ctx.send("🔓 Le salon a été débloqué.")
 
 @bot.command()
@@ -582,6 +584,7 @@ async def server_stats(ctx):
     embed.add_field(name="Nombre de canaux", value=total_channels)
     embed.add_field(name="Nombre de rôles", value=total_roles)
     embed.add_field(name="Nombre d'emojis", value=total_emojis)
+    if server.icon:
     embed.set_thumbnail(url=server.icon.url)
     await ctx.send(embed=embed)
 
@@ -603,22 +606,18 @@ async def server_info(ctx):
     await ctx.send(embed=embed)
 
 
-# Commande pour banlist 
+# Commande pour banlist
 @bot.command()
 @commands.has_permissions(ban_members=True)
 async def banlist(ctx):
-    bans = await ctx.guild.bans()
-    if bans:
-        banned_members = "\n".join([ban.user.name for ban in bans])
-        embed = discord.Embed(
-            title="Liste des membres bannis",
-            description=banned_members,
-            color=discord.Color.red()
-        )
-        await ctx.send(embed=embed)
-    else:
+    bans = [entry async for entry in ctx.guild.bans(limit=None)]
+    if not bans:
         await ctx.send("Il n'y a aucun membre banni sur ce serveur.")
-
+        return
+    text = "\n".join(f"{entry.user} (`{entry.user.id}`)" for entry in bans)
+    if len(text) > 4000:
+        text = text[:3990] + "\n…"
+    await ctx.send(embed=discord.Embed(title=f"Membres bannis ({len(bans)})", description=text, color=discord.Color.red()))
 
 
 async def uptime(ctx):
@@ -665,34 +664,32 @@ async def derank(ctx, member: discord.Member):
         await ctx.send(f"{member.mention} n'a aucun rôle à supprimer.")
 
 
-# Commande pour Mute quelqu'un temporairement
 @bot.command()
-@commands.has_permissions(manage_roles=True)
-async def mute(ctx, member: discord.Member, reason=None, duration: str = None):
-    mute_role = get(ctx.guild.roles, name="Muted")
-    if not mute_role:
-        perms = discord.Permissions(send_messages=False, speak=False)
-        mute_role = await ctx.guild.create_role(name="Muted", permissions=perms)
+@commands.has_permissions(moderate_members=True)
+async def mute(ctx, member: discord.Member, duration: int = 10, *, reason=None):
+    """+mute @user <minutes> [raison]"""
+    if not 0 < duration <= 40320:
+        await ctx.send("⏳ Durée invalide (1 à 40320 minutes).")
+        return
+    try:
+        await member.timeout(timedelta(minutes=duration), reason=reason)
+    except discord.Forbidden:
+        await ctx.send("❌ Je ne peux pas mute ce membre (rôle trop haut ou permission manquante).")
+        return
+    await ctx.send(f"🔇 {member.mention} est mute pour {duration} min. Raison : {reason or 'Aucune'}.")
 
-    await member.add_roles(mute_role)
-    await ctx.send(f"🔇 {member.mention} a été mute. Raison: {reason or 'Aucune'}.")
 
-    if duration:
-        try:
-            duration = int(duration) * 60  # Convertir la durée en secondes
-            await asyncio.sleep(duration)
-            await member.remove_roles(mute_role)
-            await ctx.send(f"🔊 {member.mention} n'est plus mute.")
-        except ValueError:
-            await ctx.send("⏳ Durée invalide. Utilisez un nombre.")
-
-# Commande pour Unmute quelqu'un 
 @bot.command()
-@commands.has_permissions(manage_roles=True)
+@commands.has_permissions(moderate_members=True)
+async def tempmute(ctx, member: discord.Member, duration: int):
+    await ctx.invoke(mute, member=member, duration=duration, reason=None)
+
+
+@bot.command()
+@commands.has_permissions(moderate_members=True)
 async def unmute(ctx, member: discord.Member):
-    mute_role = get(ctx.guild.roles, name="Muted")
-    if mute_role in member.roles:
-        await member.remove_roles(mute_role)
+    if member.is_timed_out():
+        await member.timeout(None)
         await ctx.send(f"🔊 {member.mention} a été démuté.")
     else:
         await ctx.send(f"{member.mention} n'est pas mute.")
@@ -720,19 +717,59 @@ async def check_warns(ctx, member: discord.Member):
     else:
         await ctx.send(f"{member.mention} n'a aucun avertissement.")
 
-# Commande pour TempBan @bot.command()
-@commands.has_permissions(ban_members=True)
-async def tempban(ctx, member: discord.Member, duration: str, *, reason=None):
-    try:
-        duration = int(duration) * 3600  # Convertir en secondes
-        await member.ban(reason=reason)
-        await ctx.send(f"⚠️ {member.mention} a été temporairement banni pour {duration // 3600} heures.")
+TEMPBANS_FILE = Path(__file__).parent / "tempbans.json"
 
-        await asyncio.sleep(duration)
-        await ctx.guild.unban(member)
-        await ctx.send(f"🔓 {member.mention} a été débanni après {duration // 3600} heures.")
-    except ValueError:
-        await ctx.send("⏳ Durée invalide. Utilisez un nombre.")
+def load_tempbans():
+    try:
+        if TEMPBANS_FILE.exists():
+            return {str(k): float(v) for k, v in json.loads(TEMPBANS_FILE.read_text(encoding="utf-8")).items()}
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as error:
+        print(f"⚠️ Tempbans non chargés : {error}")
+    return {}
+
+tempbans = load_tempbans()  # {"guild_id:user_id": timestamp_de_fin}
+
+def save_tempbans():
+    try:
+        TEMPBANS_FILE.write_text(json.dumps(tempbans, indent=2), encoding="utf-8")
+    except OSError as error:
+        print(f"⚠️ Tempbans non enregistrés : {error}")
+
+
+@bot.command()
+@commands.has_permissions(ban_members=True)
+async def tempban(ctx, member: discord.Member, duration: int, *, reason=None):
+    if duration <= 0:
+        await ctx.send("⏳ La durée doit être un nombre d'heures supérieur à 0.")
+        return
+    await member.ban(reason=reason)
+    end = discord.utils.utcnow() + timedelta(hours=duration)
+    tempbans[f"{ctx.guild.id}:{member.id}"] = end.timestamp()
+    save_tempbans()
+    await ctx.send(f"⚠️ {member.mention} a été banni pour {duration} heure(s).")
+
+
+@tasks.loop(minutes=1)
+async def tempban_checker():
+    now = discord.utils.utcnow().timestamp()
+    for key, end in list(tempbans.items()):
+        if end > now:
+            continue
+        guild_id, user_id = (int(x) for x in key.split(":"))
+        guild = bot.get_guild(guild_id)
+        if guild is not None:
+            try:
+                await guild.unban(discord.Object(id=user_id), reason="Fin du tempban")
+            except discord.NotFound:
+                pass  # déjà débanni
+            except discord.HTTPException:
+                continue  # on réessaiera à la prochaine minute
+        tempbans.pop(key, None)
+        save_tempbans()
+
+@tempban_checker.before_loop
+async def before_tempban_checker():
+    await bot.wait_until_ready()
 
 
 # ============================================================
@@ -1273,7 +1310,7 @@ async def logs_automod_action(execution):
     guild = bot.get_guild(execution.guild_id)
     if guild is None:
         return
-    embed = log_embed("🚨 Action AutoMod déclenchée", discord.Color.red())
+    embed = log_embed("🚨 Action AutoMod déclenchée", color=discord.Color.red())
     embed.description = f"Une règle AutoMod a été déclenchée pour <@{execution.user_id}>."
     embed.add_field(name="Utilisateur", value=f"<@{execution.user_id}> (`{execution.user_id}`)", inline=False)
     if execution.channel_id:
@@ -2936,10 +2973,12 @@ class STGHelpView(ui.LayoutView):
             return False
 
         if cid == "stg_help_close":
-            await interaction.response.edit_message(content="Panel d'aide fermé.", view=None)
-            return False
-
-        return True
+    view = ui.LayoutView(timeout=None)
+    c = ui.Container(accent_colour=discord.Colour.from_str("#333333"))
+    c.add_item(ui.TextDisplay("Panel d'aide fermé."))
+    view.add_item(c)
+    await interaction.response.edit_message(view=view)
+    return False
 
 
 @bot.command(name="help")
@@ -2971,7 +3010,59 @@ async def slash_help(interaction: discord.Interaction):
         ephemeral=True,
     )
 
+NOTES_FILE = Path(__file__).parent / "notes.json"
 
+def load_notes():
+    try:
+        if NOTES_FILE.exists():
+            return json.loads(NOTES_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        pass
+    return {}
+
+notes = load_notes()  # {"guild_id:user_id": [{"note":..., "author":..., "date":...}]}
+
+def save_notes():
+    try:
+        NOTES_FILE.write_text(json.dumps(notes, indent=2, ensure_ascii=False), encoding="utf-8")
+    except OSError as error:
+        print(f"⚠️ Notes non enregistrées : {error}")
+
+
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def add_note(ctx, member: discord.Member, *, note: str):
+    key = f"{ctx.guild.id}:{member.id}"
+    notes.setdefault(key, []).append({
+        "note": note,
+        "author": str(ctx.author),
+        "date": discord.utils.utcnow().strftime("%d/%m/%Y"),
+    })
+    save_notes()
+    await ctx.send(f"📝 Note ajoutée pour {member.mention}.")
+
+
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def show_notes(ctx, member: discord.Member):
+    entries = notes.get(f"{ctx.guild.id}:{member.id}", [])
+    if not entries:
+        await ctx.send(f"{member.mention} n'a aucune note.")
+        return
+    text = "\n".join(f"**{i}.** {e['note']} — *{e['author']}, {e['date']}*" for i, e in enumerate(entries, 1))
+    await ctx.send(embed=discord.Embed(title=f"Notes de {member}", description=text[:4000], color=discord.Color.blue()))
+
+
+@bot.command()
+@commands.has_permissions(manage_channels=True)
+async def private_channel(ctx, name: str, member: discord.Member):
+    overwrites = {
+        ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        member: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+        ctx.guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+    }
+    channel = await ctx.guild.create_text_channel(name, overwrites=overwrites, category=ctx.channel.category)
+    await ctx.send(f"🔒 Salon privé créé : {channel.mention}")
 
 
 @bot.event
